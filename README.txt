@@ -1,0 +1,1 @@
+Removes all hidden files and directories (start with a dot character) in a given directory.
