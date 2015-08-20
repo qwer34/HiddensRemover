@@ -20,6 +20,7 @@
 
 #include <unistd.h>
 #include <dirent.h>
+#include <ftw.h>
 #include <sys/param.h>
 
 #endif
@@ -78,6 +79,15 @@ static void PrintInfo(void)
 	printf("* %s [<Dir>]\r\n", EXEC_BINARY_NAME);
 	printf("************************************\r\n");
 }
+
+#ifndef WIN32
+
+static int MacUnlinkCallback(const char * szPath, const struct stat * pStat, int nTypeflag, struct FTW * pFtw)
+{
+	return remove(szPath);
+}
+
+#endif
 
 static void CleanDirectory(const string& strPath, bool bRemoveAll = false)
 {
@@ -157,46 +167,72 @@ static void CleanDirectory(const string& strPath, bool bRemoveAll = false)
 
 #else
 
-#if 0
-	string strFullPath = strRootPath + strRelativePath;
 	DIR * dir;
 	struct dirent * entry;
 	struct stat statbuf;
 
-	if (!(dir = opendir(strFullPath.c_str())))
+	if (!(dir = opendir(strPath.c_str())))
 	{
+		printf("Cannot be accessed: %s\r\n", strPath.c_str());
 		return;
 	}
 
 	while ((entry = readdir(dir)))
 	{
-		if ('.' == entry->d_name[0])
+		string strFileName = entry->d_name;
+
+		if ("." == strFileName || ".." == strFileName || ".svn" == strFileName || ".git" == strFileName)
 		{
-			continue;
-		}
-
-		string strSub = strFullPath + entry->d_name;
-
-		lstat(strSub.c_str(), &statbuf);
-
-		if (S_ISDIR(statbuf.st_mode))
-		{
-			const string strSubDir = strRelativePath + entry->d_name + "/";
-			ParseDirectory(cJsonAssets, strRootPath, strSubDir);
+			//
 		}
 		else
 		{
-			const string strSubFile = strRelativePath + entry->d_name;
-			const string strMD5 = GetMd5OfFile(strSub);
-			cJSON * cJsonFile = cJSON_CreateObject();
+			string strSub = strPath + entry->d_name;
 
-			cJSON_AddItemToObject(cJsonFile, "md5", cJSON_CreateString(strMD5.c_str()));
-			cJSON_AddItemToObject(cJsonAssets, strSubFile.c_str(), cJsonFile);
+			lstat(strSub.c_str(), &statbuf);
+
+			bool bIsDir = S_ISDIR(statbuf.st_mode);
+			bool bStartingWithDot = ('.' == strFileName[0]);
+
+			if (bIsDir)
+			{
+				strSub += PATH_SEPARATOR_STRING;
+				CleanDirectory(strSub, bRemoveAll || bStartingWithDot);
+			}
+			else if (bRemoveAll || bStartingWithDot)
+			{
+				if (-1 == remove(strSub.c_str()))
+				{
+					printf("Remove file failed: %s\r\n", strSub.c_str());
+				}
+				else
+				{
+					printf("File removed: %s\r\n", strSub.c_str());
+				}
+			}
 		}
 	}
 
 	closedir(dir);
-#endif
+
+	if (bRemoveAll)
+	{
+		if (-1 == remove(strPath.c_str()))
+		{
+			if (nftw(strPath.c_str(), MacUnlinkCallback, 64, FTW_DEPTH | FTW_PHYS))
+			{
+				printf("Remove directory failed: %s\r\n", strPath.c_str());
+			}
+			else
+			{
+				printf("Directory removed: %s\r\n", strPath.c_str());
+			}
+		}
+		else
+		{
+			printf("Directory removed: %s\r\n", strPath.c_str());
+		}
+	}
 
 #endif
 }
