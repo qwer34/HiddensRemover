@@ -49,10 +49,6 @@
 #define F_OK		(0)		/* Test for existence.  */
 #endif
 
-using namespace std;
-
-//////////////////////////////////////////////////////////////////////////
-
 #ifdef WIN32
 #define PATH_SEPARATOR_CHAR				'\\'
 #define PATH_SEPARATOR_STRING			"\\"
@@ -61,7 +57,27 @@ using namespace std;
 #define PATH_SEPARATOR_STRING			"/"
 #endif
 
+using namespace std;
+
 //////////////////////////////////////////////////////////////////////////
+
+#define EXEC_BINARY_NAME				"HiddensRemover"
+#define EXEC_BINARY_VERSION				"0.0.1"
+
+//////////////////////////////////////////////////////////////////////////
+
+static void PrintInfo(void)
+{
+	printf("************************************\r\n");
+	printf("* %s  Ver. %s\r\n", EXEC_BINARY_NAME, EXEC_BINARY_VERSION);
+	printf("* Powered by Xin Zhang\r\n");
+	printf("* %s %s\r\n", __TIME__, __DATE__);
+	printf("*\r\n");
+	printf("* Usage:\r\n");
+	printf("* ------\r\n");
+	printf("* %s [<Dir>]\r\n", EXEC_BINARY_NAME);
+	printf("************************************\r\n");
+}
 
 static void CleanDirectory(const string& strPath, bool bRemoveAll = false)
 {
@@ -73,6 +89,7 @@ static void CleanDirectory(const string& strPath, bool bRemoveAll = false)
 
 	if (INVALID_HANDLE_VALUE == hFind)
 	{
+		printf("Cannot be accessed: %s\r\n", strPath.c_str());
 		return;
 	}
 
@@ -121,7 +138,16 @@ static void CleanDirectory(const string& strPath, bool bRemoveAll = false)
 	{
 		if (-1 == remove(strPath.c_str()))
 		{
-			printf("Remove directory failed: %s\r\n", strPath.c_str());
+			std::string strCmd = "cmd /c rd /s /q \"" + strPath + "\"";
+
+			if (WinExec(strCmd.c_str(), SW_HIDE) > 31)
+			{
+				printf("Directory removed: %s\r\n", strPath.c_str());
+			}
+			else
+			{
+				printf("Remove directory failed: %s\r\n", strPath.c_str());
+			}
 		}
 		else
 		{
@@ -177,5 +203,27 @@ static void CleanDirectory(const string& strPath, bool bRemoveAll = false)
 
 int main(int argc, char * argv[])
 {
+	PrintInfo();
+
+	string strRoot = "." PATH_SEPARATOR_STRING;
+
+	if (argc >= 2)
+	{
+		strRoot = argv[1];
+
+		char cLastChar = strRoot[strRoot.length() - 1];
+
+		if (PATH_SEPARATOR_CHAR != cLastChar && '/' != cLastChar)
+		{
+			strRoot += PATH_SEPARATOR_STRING;
+		}
+	}
+
+	CleanDirectory(strRoot);
+
+#if defined(WIN32) && (defined(DEBUG) || defined(_DEBUG))
+	getchar();
+#endif
+
 	return 0;
 }
